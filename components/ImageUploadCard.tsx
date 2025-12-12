@@ -1,3 +1,4 @@
+
 import React, { useRef } from 'react';
 import { ImageFile } from '../types.ts';
 import { Upload, X } from 'lucide-react';
@@ -11,6 +12,10 @@ interface ImageUploadCardProps {
   onRemove: () => void;
   disabled?: boolean;
   className?: string;
+  texts: {
+    clickToUpload: string;
+    dragDrop: string;
+  }
 }
 
 const ImageUploadCard: React.FC<ImageUploadCardProps> = ({
@@ -21,7 +26,8 @@ const ImageUploadCard: React.FC<ImageUploadCardProps> = ({
   onUpload,
   onRemove,
   disabled = false,
-  className = ""
+  className = "",
+  texts
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,7 +109,7 @@ const ImageUploadCard: React.FC<ImageUploadCardProps> = ({
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-coffee dark:text-warm-text">
-                <span className="text-accent">點擊上傳</span> 或拖放
+                <span className="text-accent">{texts.clickToUpload}</span> {texts.dragDrop}
               </p>
               <p className="text-[10px] text-coffee/50 dark:text-warm-text/50">JPG, PNG (Max 10MB)</p>
             </div>

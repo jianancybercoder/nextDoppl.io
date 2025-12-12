@@ -36,18 +36,49 @@ export interface VTONResult {
   }
 }
 
-export const GENERATION_PHASES = [
-  { id: AppStatus.ANALYZING, label: '第一階段：語意與材質分析', detail: '識別使用者姿勢，解析服裝布料物理屬性...' },
-  { id: AppStatus.WARPING, label: '第二階段：物理模擬翹曲', detail: '建構 3D 體積，模擬重力與布料張力...' },
-  { id: AppStatus.COMPOSITING, label: '第三階段：光場合成', detail: '處理遮擋、邊緣融合與細節修飾...' },
-  { id: AppStatus.RENDERING, label: '第四階段：觸感推論與渲染', detail: '計算穿著舒適度數據並輸出最終影像...' },
+// Removed hardcoded text from here to move to locales.ts, keeping only the phase structure if needed, 
+// but for now, we will map status to text in the component directly.
+export const GENERATION_PHASES_IDS = [
+  AppStatus.ANALYZING,
+  AppStatus.WARPING,
+  AppStatus.COMPOSITING,
+  AppStatus.RENDERING
 ];
 
 // --- New Types for Custom Provider ---
 export type ProviderType = 'google' | 'custom';
+export type Language = 'zh-TW' | 'en';
 
 export interface CustomConfig {
   baseUrl: string;
   apiKey: string;
   modelName: string;
+}
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  message: string;
+  detail?: string;
+}
+
+// --- Universal Gateway Interfaces (Core Design) ---
+
+export interface UniversalApiInput {
+  baseUrl?: string;         // Optional for Google SDK
+  apiKey: string;
+  model: string;
+  
+  // VTON Specific Payload Context
+  messages?: any[];         // For Chat Completion APIs
+  parts?: any[];            // For Google SDK
+  
+  // Generic Options
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface UniversalApiResponse {
+  content: string;         // The text content (JSON analysis)
+  images: string[];        // Extracted images (Base64 or URL)
+  raw?: any;               // Debug raw response
 }

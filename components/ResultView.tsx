@@ -1,23 +1,28 @@
+
 import React from 'react';
 import { Download, Maximize2, X, ChevronDown, Activity, Wind, Scale, HandMetal, Sparkles, Zap } from 'lucide-react';
-import { VTONResult } from '../types.ts';
+import { VTONResult, Language } from '../types.ts';
+import { translations } from '../locales.ts';
 
 interface ResultViewProps {
   result: VTONResult;
   onClose: () => void;
+  language: Language;
 }
 
 // Helper component for Radar Chart
-const RadarChart = ({ scores }: { scores: any }) => {
+const RadarChart = ({ scores, t }: { scores: any, t: any }) => {
   const size = 200;
   const center = size / 2;
   const radius = 70;
+  
+  // Use translated labels
   const metrics = [
-    { key: 'comfort', label: '舒適' },
-    { key: 'breathability', label: '透氣' },
-    { key: 'softness', label: '柔軟' },
-    { key: 'elasticity', label: '彈性' },
-    { key: 'heaviness', label: '份量' },
+    { key: 'comfort', label: t.result.metrics.comfort },
+    { key: 'breathability', label: t.result.metrics.breathability },
+    { key: 'softness', label: t.result.metrics.touch },
+    { key: 'elasticity', label: t.result.metrics.elasticity },
+    { key: 'heaviness', label: t.result.metrics.weight },
   ];
 
   const angleStep = (Math.PI * 2) / metrics.length;
@@ -63,7 +68,7 @@ const RadarChart = ({ scores }: { scores: any }) => {
   return (
     <div className="relative flex justify-center py-4">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
-        {/* Background Grids - Adjusted for light/dark visibility via CSS classes not possible inside SVG easily without currentColor, using opacity */}
+        {/* Background Grids */}
         {webs.map((pointsStr, i) => (
           <polygon 
             key={i} 
@@ -135,7 +140,9 @@ const MetricBar = ({ label, value, colorClass, icon: Icon }: any) => (
   </div>
 );
 
-const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
+const ResultView: React.FC<ResultViewProps> = ({ result, onClose, language }) => {
+  const t = translations[language];
+  
   // Fix: Provide default values for all score properties to avoid "Property does not exist on type '{}'" error.
   const scores = result.analysis?.scores || {
     comfort: 5,
@@ -161,7 +168,7 @@ const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
       <div className="flex-1 w-full max-w-2xl flex flex-col items-center">
         <div className="flex items-center gap-2 mb-4 text-accent font-medium uppercase tracking-widest text-xs">
           <ChevronDown size={14} className="animate-bounce" />
-          生成結果 (Visual Output)
+          {t.result.title}
         </div>
 
         <div className="relative w-full group">
@@ -179,12 +186,12 @@ const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
                   className="flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-full font-bold hover:bg-gray-200 transition-colors shadow-lg shadow-black/20"
                 >
                   <Download size={18} />
-                  儲存圖片
+                  {t.result.download}
                 </button>
                 <button 
                   onClick={() => window.open(result.image, '_blank')}
                   className="p-2.5 bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-full hover:bg-white/20 transition-colors"
-                  title="在新分頁查看原圖"
+                  title="View full size"
                 >
                   <Maximize2 size={18} />
                 </button>
@@ -194,7 +201,7 @@ const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
             <button
               onClick={onClose}
               className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-red-500/80 backdrop-blur-md text-white rounded-full transition-all border border-white/10"
-              title="關閉結果"
+              title="Close"
             >
               <X size={16} />
             </button>
@@ -209,14 +216,14 @@ const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
           
           <div className="flex items-center gap-2 mb-6 border-b border-coffee/10 dark:border-white/10 pb-4">
             <Activity className="text-accent" size={20} />
-            <h3 className="font-display font-bold text-coffee dark:text-white tracking-wide">PHANTOM HAPTICS</h3>
-            <span className="text-[10px] bg-accent/10 dark:bg-accent/20 text-accent px-2 py-0.5 rounded ml-auto border border-accent/20">DATA VISUALIZATION</span>
+            <h3 className="font-display font-bold text-coffee dark:text-white tracking-wide">{t.result.hapticsTitle}</h3>
+            <span className="text-[10px] bg-accent/10 dark:bg-accent/20 text-accent px-2 py-0.5 rounded ml-auto border border-accent/20">{t.result.dataVis}</span>
           </div>
 
           {/* Radar Chart Section */}
           <div className="mb-8 bg-white/40 dark:bg-black/20 rounded-xl border border-coffee/5 dark:border-white/5 p-2">
-            <div className="text-center text-[10px] text-coffee/50 dark:text-warm-text/50 uppercase tracking-widest mb-1">Physics Profile</div>
-            <RadarChart scores={scores} />
+            <div className="text-center text-[10px] text-coffee/50 dark:text-warm-text/50 uppercase tracking-widest mb-1">{t.result.profile}</div>
+            <RadarChart scores={scores} t={t} />
           </div>
 
           {/* Detailed Metrics */}
@@ -225,7 +232,7 @@ const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
             {/* Comfort */}
             <div className="group">
               <MetricBar 
-                label="Comfort / 舒適度" 
+                label={t.result.metrics.comfort}
                 value={scores.comfort || 5} 
                 colorClass="text-yellow-600 dark:text-yellow-400" 
                 icon={Sparkles}
@@ -238,7 +245,7 @@ const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
             {/* Breathability */}
             <div className="group border-t border-coffee/10 dark:border-white/5 pt-4">
               <MetricBar 
-                label="Breathability / 透氣性" 
+                label={t.result.metrics.breathability}
                 value={scores.breathability || 5} 
                 colorClass="text-green-600 dark:text-green-400" 
                 icon={Wind}
@@ -251,7 +258,7 @@ const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
             {/* Touch */}
             <div className="group border-t border-coffee/10 dark:border-white/5 pt-4">
                <MetricBar 
-                label="Softness & Touch / 觸感" 
+                label={t.result.metrics.touch}
                 value={scores.softness || 5} 
                 colorClass="text-pink-600 dark:text-pink-400" 
                 icon={HandMetal}
@@ -264,7 +271,7 @@ const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
             {/* Weight */}
             <div className="group border-t border-coffee/10 dark:border-white/5 pt-4">
                <MetricBar 
-                label="Weight & Density / 重量感" 
+                label={t.result.metrics.weight}
                 value={scores.heaviness || 5} 
                 colorClass="text-blue-600 dark:text-blue-400" 
                 icon={Scale}
@@ -277,7 +284,7 @@ const ResultView: React.FC<ResultViewProps> = ({ result, onClose }) => {
             {/* Elasticity (Extra) */}
             <div className="group border-t border-coffee/10 dark:border-white/5 pt-4">
                <MetricBar 
-                label="Elasticity / 彈性係數" 
+                label={t.result.metrics.elasticity}
                 value={scores.elasticity || 5} 
                 colorClass="text-purple-600 dark:text-purple-400" 
                 icon={Zap}

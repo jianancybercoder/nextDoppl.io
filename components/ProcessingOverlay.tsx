@@ -1,13 +1,26 @@
+
 import React, { useEffect, useState } from 'react';
-import { AppStatus, GENERATION_PHASES } from '../types.ts';
+import { AppStatus } from '../types.ts';
+import { translations } from '../locales.ts';
 import { CheckCircle2, Loader2, Cpu } from 'lucide-react';
+import { Language } from '../types.ts';
 
 interface ProcessingOverlayProps {
   status: AppStatus;
+  language: Language;
 }
 
-const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({ status }) => {
+const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({ status, language }) => {
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
+  const t = translations[language];
+
+  // Helper to get ordered phases with translated text
+  const phases = [
+    { id: AppStatus.ANALYZING, ...t.phases[AppStatus.ANALYZING] },
+    { id: AppStatus.WARPING, ...t.phases[AppStatus.WARPING] },
+    { id: AppStatus.COMPOSITING, ...t.phases[AppStatus.COMPOSITING] },
+    { id: AppStatus.RENDERING, ...t.phases[AppStatus.RENDERING] },
+  ];
 
   useEffect(() => {
     if (status === AppStatus.IDLE || status === AppStatus.COMPLETE || status === AppStatus.ERROR) {
@@ -40,11 +53,11 @@ const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({ status }) => {
             <Cpu className="w-8 h-8 text-accent" />
           </div>
 
-          <h3 className="text-xl font-bold text-coffee dark:text-white mb-2 font-display tracking-tight">Doppl-Next 引擎</h3>
-          <p className="text-coffee/60 dark:text-warm-text/60 text-sm mb-8">正在合成虛擬試穿效果...</p>
+          <h3 className="text-xl font-bold text-coffee dark:text-white mb-2 font-display tracking-tight">{t.appTitle} Engine</h3>
+          <p className="text-coffee/60 dark:text-warm-text/60 text-sm mb-8">{language === 'zh-TW' ? '正在合成虛擬試穿效果...' : 'Synthesizing VTON results...'}</p>
 
           <div className="w-full space-y-4">
-            {GENERATION_PHASES.map((phase, index) => {
+            {phases.map((phase, index) => {
               const isActive = index === currentPhaseIndex;
               const isCompleted = index < currentPhaseIndex;
 

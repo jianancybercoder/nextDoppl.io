@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Shirt, User, AlertTriangle, MessageSquare, Key, Eye, EyeOff, ExternalLink, RefreshCw, Trash2, Settings, Sun, Moon, Globe, Server, Box, Check, X } from 'lucide-react';
+import { Sparkles, Shirt, User, AlertTriangle, MessageSquare, Key, Eye, EyeOff, ExternalLink, RefreshCw, Trash2, Settings, Sun, Moon, Globe, Server, Box, Check, X, Wifi, AlertCircle, CheckCircle, Languages } from 'lucide-react';
 import ImageUploadCard from './components/ImageUploadCard.tsx';
 import ProcessingOverlay from './components/ProcessingOverlay.tsx';
 import ResultView from './components/ResultView.tsx';
-import { ImageFile, AppStatus, VTONResult, ProviderType, CustomConfig } from './types.ts';
-import { generateVTON, fileToBase64 } from './services/geminiService.ts';
+import { ImageFile, AppStatus, VTONResult, ProviderType, CustomConfig, Language } from './types.ts';
+import { generateVTON, fileToBase64, testCustomConnection } from './services/geminiService.ts';
+import { translations } from './locales.ts';
 
 // --- Settings Modal Component ---
 interface SettingsModalProps {
@@ -19,6 +20,7 @@ interface SettingsModalProps {
   setGoogleModelName: (m: string) => void;
   customConfig: CustomConfig;
   setCustomConfig: (k: keyof CustomConfig, v: string) => void;
+  language: Language;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -31,9 +33,36 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   googleModelName,
   setGoogleModelName,
   customConfig,
-  setCustomConfig
+  setCustomConfig,
+  language
 }) => {
   const [showApiKey, setShowApiKey] = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [testMessage, setTestMessage] = useState<string>('');
+  const [testDetail, setTestDetail] = useState<string | undefined>('');
+  
+  const t = translations[language];
+
+  // Reset test status when config changes
+  useEffect(() => {
+    setTestStatus('idle');
+    setTestMessage('');
+    setTestDetail('');
+  }, [customConfig.baseUrl, customConfig.apiKey, customConfig.modelName]);
+
+  const handleTestConnection = async () => {
+    setTestStatus('testing');
+    setTestMessage(t.settings.testing);
+    setTestDetail('');
+
+    const result = await testCustomConnection(customConfig);
+
+    setTestStatus(result.ok ? 'success' : 'error');
+    // For system messages like errors, we might keep them raw or map common ones
+    // For simplicity, we use the message returned, or our localized success/fail prefix
+    setTestMessage(result.ok ? t.settings.testSuccess : t.settings.testFail);
+    setTestDetail(result.detail || result.message);
+  };
 
   if (!isOpen) return null;
 
@@ -45,7 +74,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="px-6 py-4 border-b border-coffee/5 dark:border-white/5 flex items-center justify-between bg-sand/50 dark:bg-black/20">
           <div className="flex items-center gap-2">
             <Settings size={18} className="text-accent" />
-            <h2 className="font-bold text-coffee dark:text-white text-lg font-display">引擎設定</h2>
+            <h2 className="font-bold text-coffee dark:text-white text-lg font-display">{t.settings.title}</h2>
           </div>
           <button 
             onClick={onClose}
@@ -61,7 +90,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Provider Switcher */}
           <div className="space-y-3">
              <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider">
-                AI 模型供應商
+                {t.settings.provider}
              </label>
              <div className="flex bg-coffee/5 dark:bg-black/20 p-1 rounded-xl">
                 <button
@@ -84,9 +113,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
                <div className="space-y-2">
                   <div className="flex justify-between">
-                    <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider">API Key</label>
+                    <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider">{t.settings.apiKey}</label>
                     <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent hover:underline flex items-center gap-1">
-                      取得 Key <ExternalLink size={10} />
+                      {t.settings.getKey} <ExternalLink size={10} />
                     </a>
                   </div>
                   <div className="bg-white dark:bg-obsidian border border-coffee/10 dark:border-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2 focus-within:ring-1 focus-within:ring-accent/50 focus-within:border-accent/50 transition-all">
@@ -105,7 +134,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                </div>
 
                <div className="space-y-2">
-                  <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider">模型選擇</label>
+                  <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider">{t.settings.modelSelect}</label>
                   <div className="bg-white dark:bg-obsidian border border-coffee/10 dark:border-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2">
                      <Box size={16} className="text-coffee/30 dark:text-warm-text/30" />
                      <select 
@@ -113,13 +142,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         onChange={(e) => setGoogleModelName(e.target.value)}
                         className="bg-transparent border-none outline-none w-full text-sm text-coffee dark:text-warm-text cursor-pointer [&>option]:text-black [&>option]:bg-white"
                      >
-                        <option value="gemini-2.5-flash-image">Flash 2.5 (快速/免費)</option>
-                        <option value="gemini-2.0-flash-exp">Flash 2.0 (實驗版)</option>
-                        <option value="gemini-3-pro-image-preview">Pro 3 (高畫質/付費)</option>
+                        <option value="gemini-2.5-flash-image">Flash 2.5 (Fast/Free)</option>
+                        <option value="gemini-2.0-flash-exp">Flash 2.0 (Experimental)</option>
+                        <option value="gemini-3-pro-image-preview">Pro 3 (High Res)</option>
                      </select>
                   </div>
                   <p className="text-[10px] text-coffee/50 dark:text-warm-text/50 px-1">
-                    * 推薦使用 Flash 2.5 以獲得最佳速度與免費額度。
+                    {t.settings.modelHint}
                   </p>
                </div>
             </div>
@@ -130,26 +159,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
              <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
                 <div className="p-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-100 dark:border-blue-500/20">
                    <p className="text-[10px] text-blue-800 dark:text-blue-200 leading-relaxed">
-                     適用於支援 <strong>OpenAI Chat API</strong> 格式的服務 (如 OpenRouter, DeepSeek, LocalAI)。模型必須具備 Vision 能力。
+                     {t.settings.customHint}
                    </p>
                 </div>
 
                 <div className="space-y-2">
                    <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider flex items-center gap-1">
-                      <Globe size={12} /> Base URL
+                      <Globe size={12} /> {t.settings.baseUrl}
                    </label>
                    <input 
                       type="text"
                       value={customConfig.baseUrl}
                       onChange={(e) => setCustomConfig('baseUrl', e.target.value)}
-                      placeholder="https://openrouter.ai/api/v1"
+                      placeholder="https://free.v36.cm/v1"
                       className="w-full bg-white dark:bg-obsidian border border-coffee/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs text-coffee dark:text-warm-text font-mono focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50"
                    />
+                   <p className="text-[10px] text-coffee/50 dark:text-warm-text/50 pl-1">
+                     {t.settings.baseUrlHint}
+                   </p>
                 </div>
 
                 <div className="space-y-2">
                    <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider flex items-center gap-1">
-                      <Key size={12} /> API Key
+                      <Key size={12} /> {t.settings.apiKey}
                    </label>
                    <div className="relative">
                       <input 
@@ -170,7 +202,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div className="space-y-2">
                    <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider flex items-center gap-1">
-                      <Server size={12} /> Model ID
+                      <Server size={12} /> {t.settings.modelId}
                    </label>
                    <input 
                       type="text"
@@ -180,6 +212,57 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="w-full bg-white dark:bg-obsidian border border-coffee/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs text-coffee dark:text-warm-text font-mono focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50"
                    />
                 </div>
+
+                {/* Test Connection Section */}
+                <div className="pt-2">
+                   <button 
+                      onClick={handleTestConnection}
+                      disabled={!customConfig.baseUrl || !customConfig.apiKey || !customConfig.modelName || testStatus === 'testing'}
+                      className={`
+                         w-full py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95
+                         ${testStatus === 'testing' ? 'bg-coffee/5 border-transparent text-coffee/50' : 
+                           testStatus === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/20' :
+                           testStatus === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/20' :
+                           'bg-white dark:bg-white/5 border-coffee/10 dark:border-white/10 text-coffee/70 dark:text-warm-text/70 hover:bg-coffee/5 dark:hover:bg-white/10'}
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                      `}
+                   >
+                      {testStatus === 'testing' ? (
+                         <>
+                            <RefreshCw size={14} className="animate-spin" />
+                            <span>{t.settings.testing}</span>
+                         </>
+                      ) : testStatus === 'success' ? (
+                         <>
+                            <CheckCircle size={14} />
+                            <span>{t.settings.testSuccess}</span>
+                         </>
+                      ) : testStatus === 'error' ? (
+                         <>
+                            <AlertCircle size={14} />
+                            <span>{t.settings.testFail}</span>
+                         </>
+                      ) : (
+                         <>
+                            <Wifi size={14} />
+                            <span>{t.settings.testConn}</span>
+                         </>
+                      )}
+                   </button>
+                   
+                   {/* Status Feedback Message */}
+                   {(testMessage || testDetail) && (
+                      <div className={`mt-3 p-3 rounded-lg text-[11px] leading-relaxed border ${
+                         testStatus === 'success' ? 'bg-green-500/5 border-green-500/10 text-green-700 dark:text-green-300' :
+                         testStatus === 'error' ? 'bg-red-500/5 border-red-500/10 text-red-700 dark:text-red-300' : 
+                         'bg-gray-100 dark:bg-white/5 text-gray-500'
+                      }`}>
+                         <p className="font-bold">{testMessage}</p>
+                         {testDetail && <p className="opacity-80 mt-1 font-mono break-all">{testDetail}</p>}
+                      </div>
+                   )}
+                </div>
+
              </div>
           )}
         </div>
@@ -191,7 +274,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
              className="w-full py-3 bg-gradient-to-r from-accent to-purple-600 hover:from-accent-glow hover:to-purple-500 text-white rounded-xl font-bold shadow-lg shadow-accent/20 active:scale-95 transition-all flex items-center justify-center gap-2"
            >
              <Check size={18} />
-             <span>完成設定</span>
+             <span>{t.settings.complete}</span>
            </button>
         </div>
       </div>
@@ -203,6 +286,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 const App: React.FC = () => {
   // Theme State
   const [darkMode, setDarkMode] = useState<boolean>(true);
+  const [language, setLanguage] = useState<Language>('zh-TW');
 
   // --- Provider Settings State ---
   const [provider, setProvider] = useState<ProviderType>('google');
@@ -231,6 +315,7 @@ const App: React.FC = () => {
 
   const resultSectionRef = useRef<HTMLDivElement>(null);
   const isGeneratingRef = useRef<boolean>(false);
+  const t = translations[language];
 
   // Initialization
   useEffect(() => {
@@ -240,6 +325,11 @@ const App: React.FC = () => {
     const savedProvider = localStorage.getItem('doppl_provider');
     if (savedProvider === 'custom' || savedProvider === 'google') {
       setProvider(savedProvider as ProviderType);
+    }
+
+    const savedLang = localStorage.getItem('doppl_lang');
+    if (savedLang === 'en' || savedLang === 'zh-TW') {
+        setLanguage(savedLang);
     }
 
     const savedCustom = localStorage.getItem('doppl_custom_config');
@@ -259,6 +349,12 @@ const App: React.FC = () => {
   }, []);
 
   // Handlers
+  const toggleLanguage = () => {
+    const newLang = language === 'zh-TW' ? 'en' : 'zh-TW';
+    setLanguage(newLang);
+    localStorage.setItem('doppl_lang', newLang);
+  };
+
   const handleGoogleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newKey = e.target.value.trim();
     setGoogleApiKey(newKey);
@@ -291,7 +387,7 @@ const App: React.FC = () => {
       setErrorMsg(null);
     } catch (err) {
       console.error("File processing error", err);
-      setErrorMsg("圖片處理失敗，請嘗試其他檔案。");
+      setErrorMsg(t.errors.processFailed);
     }
   };
 
@@ -316,13 +412,13 @@ const App: React.FC = () => {
     // Validation
     if (provider === 'google' && !googleApiKey) {
       setIsSettingsOpen(true);
-      setErrorMsg("請先設定 Google API Key。");
+      setErrorMsg(t.errors.noKey);
       return;
     }
     if (provider === 'custom') {
       if (!customConfig.baseUrl || !customConfig.apiKey || !customConfig.modelName) {
         setIsSettingsOpen(true);
-        setErrorMsg("請完整填寫自定義 API 設定。");
+        setErrorMsg(t.errors.incompleteCustom);
         return;
       }
     }
@@ -343,7 +439,8 @@ const App: React.FC = () => {
       userImage.base64,
       userImage.mimeType,
       garmentImage.base64,
-      garmentImage.mimeType
+      garmentImage.mimeType,
+      language
     );
 
     try {
@@ -363,7 +460,7 @@ const App: React.FC = () => {
       if (error.message) {
          setErrorMsg(error.message);
       } else {
-         setErrorMsg("生成失敗。請檢查設定或網路連線。");
+         setErrorMsg(t.errors.genFailed);
       }
     } finally {
       isGeneratingRef.current = false;
@@ -400,41 +497,54 @@ const App: React.FC = () => {
         setGoogleModelName={setGoogleModelName}
         customConfig={customConfig}
         setCustomConfig={handleCustomConfigChange}
+        language={language}
       />
 
       <div className="min-h-screen transition-colors duration-500 bg-paper text-coffee dark:bg-obsidian dark:text-warm-text font-sans selection:bg-accent/30 selection:text-coffee dark:selection:text-warm-text pb-20">
-        <ProcessingOverlay status={status} />
+        <ProcessingOverlay status={status} language={language} />
 
-        {/* Header */}
+        {/* Header - RWD Optimized */}
         <header className="fixed top-0 left-0 right-0 z-40 bg-paper/80 dark:bg-obsidian/80 backdrop-blur-md border-b border-coffee/5 dark:border-white/5 transition-colors duration-500">
           <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <div className="w-8 h-8 bg-gradient-to-br from-accent to-purple-500 rounded-lg flex items-center justify-center shadow-lg shadow-accent/20">
                 <Sparkles size={18} className="text-white" />
               </div>
-              <span className="font-display font-bold text-lg tracking-tight text-coffee dark:text-white">Doppl-Next</span>
+              <span className="font-display font-bold text-lg tracking-tight text-coffee dark:text-white hidden sm:block">Doppl-Next</span>
             </div>
             
-            <div className="flex items-center gap-3">
-               {/* Current Model Label (Optional, showing active config) */}
-               <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono text-coffee/40 dark:text-warm-text/40 bg-coffee/5 dark:bg-white/5 px-2 py-1 rounded-md">
+            <div className="flex items-center gap-2 md:gap-3">
+               {/* Current Model Label (Hidden on mobile) */}
+               <div className="hidden md:flex items-center gap-2 text-[10px] font-mono text-coffee/40 dark:text-warm-text/40 bg-coffee/5 dark:bg-white/5 px-2 py-1 rounded-md">
                   <div className={`w-1.5 h-1.5 rounded-full ${provider === 'google' && googleApiKey ? 'bg-green-500' : provider === 'custom' && customConfig.apiKey ? 'bg-blue-500' : 'bg-red-500'}`}></div>
                   {provider === 'google' ? 'Gemini' : 'Custom'}
                </div>
 
+               {/* Settings Button */}
                <button 
                   onClick={() => setIsSettingsOpen(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-coffee/5 dark:bg-white/5 hover:bg-coffee/10 dark:hover:bg-white/10 text-coffee dark:text-warm-text/80 transition-colors border border-transparent hover:border-coffee/10 dark:hover:border-white/10"
-                  title="設定"
+                  className="flex items-center gap-2 px-2 md:px-3 py-1.5 rounded-full bg-coffee/5 dark:bg-white/5 hover:bg-coffee/10 dark:hover:bg-white/10 text-coffee dark:text-warm-text/80 transition-colors border border-transparent hover:border-coffee/10 dark:hover:border-white/10"
+                  title="Settings"
                >
                   <Settings size={16} />
-                  <span className="text-xs font-medium hidden sm:inline">Settings</span>
+                  <span className="text-xs font-medium hidden md:inline">Settings</span>
                </button>
 
+               {/* Language Switcher - Compact on mobile */}
+               <button 
+                  onClick={toggleLanguage}
+                  className="flex items-center gap-1.5 px-2 md:px-3 py-1.5 rounded-full bg-coffee/5 dark:bg-white/5 hover:bg-coffee/10 dark:hover:bg-white/10 text-coffee dark:text-warm-text/80 transition-colors"
+                  title="Switch Language"
+               >
+                  <Languages size={16} />
+                  <span className="text-xs font-medium w-6 text-center">{language === 'zh-TW' ? '繁' : 'EN'}</span>
+               </button>
+
+               {/* Theme Toggle */}
                <button 
                   onClick={() => setDarkMode(!darkMode)}
                   className="p-2 rounded-full hover:bg-coffee/5 dark:hover:bg-white/10 transition-colors text-coffee dark:text-warm-text/80 active:scale-90"
-                  title={darkMode ? "切換亮色模式" : "切換暗色模式"}
+                  title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                >
                   {darkMode ? <Sun size={18} /> : <Moon size={18} />}
                </button>
@@ -447,17 +557,17 @@ const App: React.FC = () => {
           {!resultData && (
             <div className="text-center space-y-4 max-w-2xl mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <h1 className="text-3xl md:text-5xl font-display font-bold text-coffee dark:text-white tracking-tight leading-tight">
-                Gemini 3 Pro <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-purple-400">真實物理 VTON 引擎</span>
+                Gemini 3 Pro <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-purple-400">{t.heroTitle}</span>
               </h1>
               <p className="text-coffee/70 dark:text-warm-text/70 text-base md:text-lg leading-relaxed px-4">
-                上傳照片與服裝。利用高階物理模擬與 <span className="text-coffee dark:text-white font-medium">Phantom Haptics</span> 觸感分析技術，合成 8K 級的攝影擬真試穿效果。
+                {t.heroSubtitle}
               </p>
             </div>
           )}
 
           {resultData && (
             <div ref={resultSectionRef} className="w-full flex justify-center mb-8">
-               <ResultView result={resultData} onClose={handleCloseResult} />
+               <ResultView result={resultData} onClose={handleCloseResult} language={language} />
             </div>
           )}
 
@@ -477,13 +587,14 @@ const App: React.FC = () => {
               <div className="flex flex-col md:flex-row gap-4 md:gap-8 mb-8 relative">
                 <ImageUploadCard
                   id="user-upload"
-                  label="目標使用者"
-                  subLabel="全身或半身照片"
+                  label={t.upload.userLabel}
+                  subLabel={t.upload.userSub}
                   image={userImage}
                   onUpload={(f) => handleImageUpload(f, 'user')}
                   onRemove={() => setUserImage(null)}
                   disabled={isProcessing}
                   className="w-full md:flex-1 min-w-0"
+                  texts={t.upload}
                 />
 
                 {/* Mobile Connector */}
@@ -510,28 +621,27 @@ const App: React.FC = () => {
 
                 <ImageUploadCard
                   id="garment-upload"
-                  label="目標服飾"
-                  subLabel="平拍或模特兒照片"
+                  label={t.upload.garmentLabel}
+                  subLabel={t.upload.garmentSub}
                   image={garmentImage}
                   onUpload={(f) => handleImageUpload(f, 'garment')}
                   onRemove={() => setGarmentImage(null)}
                   disabled={isProcessing}
                   className="w-full md:flex-1 min-w-0"
+                  texts={t.upload}
                 />
               </div>
 
               <div className="space-y-3">
                 <label htmlFor="prompt-input" className="flex items-center gap-2 text-sm font-medium text-coffee/80 dark:text-warm-text/80 ml-1">
                   <MessageSquare size={16} className="text-accent" />
-                  {resultData ? '微調需求 / 追加指令' : '詳細微調需求 (選填)'}
+                  {resultData ? t.prompt.labelRefine : t.prompt.label}
                 </label>
                 <textarea
                   id="prompt-input"
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
-                  placeholder={resultData 
-                    ? "例如：請把褲子改短一點、讓光線亮一點，或試著把衣服紮進去... (直接輸入新指令，點擊下方重新生成)" 
-                    : "例如：請保留我的手錶，並讓衣服看起來更寬鬆一點..."}
+                  placeholder={resultData ? t.prompt.placeholderRefine : t.prompt.placeholder}
                   className="w-full h-24 bg-white dark:bg-charcoal border border-coffee/10 dark:border-white/10 rounded-xl p-4 text-sm text-coffee dark:text-warm-text placeholder-coffee/40 dark:placeholder-warm-text/40 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all resize-none shadow-sm dark:shadow-none"
                   disabled={isProcessing}
                 />
@@ -545,7 +655,7 @@ const App: React.FC = () => {
                     disabled={isProcessing}
                   >
                     <Trash2 size={18} />
-                    <span className="sm:hidden md:inline">重來</span>
+                    <span className="sm:hidden md:inline">{t.actions.reset}</span>
                   </button>
                 )}
                 
@@ -563,18 +673,18 @@ const App: React.FC = () => {
                   {isProcessing ? (
                     <>
                       <RefreshCw className="animate-spin" size={20} />
-                      <span>PROCESSING...</span>
+                      <span>{t.actions.processing}</span>
                     </>
                   ) : resultData ? (
                     <>
                       <Sparkles size={20} />
-                      <span>依據新設定重新生成</span>
+                      <span>{t.actions.regenerate}</span>
                     </>
                   ) : (
                     <>
                       <Sparkles size={20} />
                       <span>
-                         {provider === 'google' && !googleApiKey ? '設定 Key 並啟動' : '啟動 VTON 引擎'}
+                         {provider === 'google' && !googleApiKey ? t.actions.setupKey : t.actions.generate}
                       </span>
                     </>
                   )}

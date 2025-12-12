@@ -72,16 +72,18 @@
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
+    "react-dom/client": "https://esm.sh/react-dom@^19.2.1/client",
     "react/": "https://esm.sh/react@^19.2.1/",
     "@google/genai": "https://esm.sh/@google/genai@^1.32.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.559.0"
+    "lucide-react": "https://esm.sh/lucide-react@^0.559.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
-    <script type="text/babel" data-presets="react,typescript" src="./index.tsx"></script>
+    <!-- 重要: data-type="module" 讓 Babel 能夠處理 import 語法 -->
+    <script type="text/babel" data-type="module" data-presets="react,typescript" src="./index.tsx"></script>
   </body>
 </html>

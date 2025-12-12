@@ -1,3 +1,4 @@
+
 export interface ImageFile {
   file: File;
   previewUrl: string;
@@ -41,3 +42,12 @@ export const GENERATION_PHASES = [
   { id: AppStatus.COMPOSITING, label: '第三階段：光場合成', detail: '處理遮擋、邊緣融合與細節修飾...' },
   { id: AppStatus.RENDERING, label: '第四階段：觸感推論與渲染', detail: '計算穿著舒適度數據並輸出最終影像...' },
 ];
+
+// --- New Types for Custom Provider ---
+export type ProviderType = 'google' | 'custom';
+
+export interface CustomConfig {
+  baseUrl: string;
+  apiKey: string;
+  modelName: string;
+}

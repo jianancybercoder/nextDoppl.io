@@ -1,25 +1,230 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Shirt, User, AlertTriangle, MessageSquare, Key, Eye, EyeOff, ExternalLink, RefreshCw, Trash2, Settings2, Sun, Moon, CreditCard, Info, ShieldAlert } from 'lucide-react';
+import { Sparkles, Shirt, User, AlertTriangle, MessageSquare, Key, Eye, EyeOff, ExternalLink, RefreshCw, Trash2, Settings, Sun, Moon, Globe, Server, Box, Check, X } from 'lucide-react';
 import ImageUploadCard from './components/ImageUploadCard.tsx';
 import ProcessingOverlay from './components/ProcessingOverlay.tsx';
 import ResultView from './components/ResultView.tsx';
-import { ImageFile, AppStatus, VTONResult } from './types.ts';
+import { ImageFile, AppStatus, VTONResult, ProviderType, CustomConfig } from './types.ts';
 import { generateVTON, fileToBase64 } from './services/geminiService.ts';
 
+// --- Settings Modal Component ---
+interface SettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  provider: ProviderType;
+  setProvider: (p: ProviderType) => void;
+  googleApiKey: string;
+  setGoogleApiKey: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  googleModelName: string;
+  setGoogleModelName: (m: string) => void;
+  customConfig: CustomConfig;
+  setCustomConfig: (k: keyof CustomConfig, v: string) => void;
+}
+
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  provider,
+  setProvider,
+  googleApiKey,
+  setGoogleApiKey,
+  googleModelName,
+  setGoogleModelName,
+  customConfig,
+  setCustomConfig
+}) => {
+  const [showApiKey, setShowApiKey] = useState(false);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-paper dark:bg-charcoal border border-coffee/10 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-coffee/5 dark:border-white/5 flex items-center justify-between bg-sand/50 dark:bg-black/20">
+          <div className="flex items-center gap-2">
+            <Settings size={18} className="text-accent" />
+            <h2 className="font-bold text-coffee dark:text-white text-lg font-display">引擎設定</h2>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-coffee/10 dark:hover:bg-white/10 text-coffee/60 dark:text-warm-text/60 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-6">
+          
+          {/* Provider Switcher */}
+          <div className="space-y-3">
+             <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider">
+                AI 模型供應商
+             </label>
+             <div className="flex bg-coffee/5 dark:bg-black/20 p-1 rounded-xl">
+                <button
+                  onClick={() => setProvider('google')}
+                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${provider === 'google' ? 'bg-white dark:bg-obsidian text-accent shadow-sm' : 'text-coffee/50 dark:text-warm-text/50 hover:text-coffee dark:hover:text-warm-text'}`}
+                >
+                  Google Gemini
+                </button>
+                <button
+                  onClick={() => setProvider('custom')}
+                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${provider === 'custom' ? 'bg-white dark:bg-obsidian text-accent shadow-sm' : 'text-coffee/50 dark:text-warm-text/50 hover:text-coffee dark:hover:text-warm-text'}`}
+                >
+                  Custom / OpenAI
+                </button>
+             </div>
+          </div>
+
+          {/* Google Settings */}
+          {provider === 'google' && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+               <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider">API Key</label>
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent hover:underline flex items-center gap-1">
+                      取得 Key <ExternalLink size={10} />
+                    </a>
+                  </div>
+                  <div className="bg-white dark:bg-obsidian border border-coffee/10 dark:border-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2 focus-within:ring-1 focus-within:ring-accent/50 focus-within:border-accent/50 transition-all">
+                     <Key size={16} className={googleApiKey ? 'text-green-500' : 'text-coffee/30 dark:text-warm-text/30'} />
+                     <input 
+                        type={showApiKey ? "text" : "password"}
+                        value={googleApiKey}
+                        onChange={setGoogleApiKey}
+                        placeholder="AIza..."
+                        className="bg-transparent border-none outline-none flex-1 text-sm text-coffee dark:text-warm-text font-mono placeholder-coffee/30 dark:placeholder-warm-text/30"
+                     />
+                     <button onClick={() => setShowApiKey(!showApiKey)} className="text-coffee/40 dark:text-warm-text/40 hover:text-coffee dark:hover:text-warm-text">
+                        {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                     </button>
+                  </div>
+               </div>
+
+               <div className="space-y-2">
+                  <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider">模型選擇</label>
+                  <div className="bg-white dark:bg-obsidian border border-coffee/10 dark:border-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2">
+                     <Box size={16} className="text-coffee/30 dark:text-warm-text/30" />
+                     <select 
+                        value={googleModelName}
+                        onChange={(e) => setGoogleModelName(e.target.value)}
+                        className="bg-transparent border-none outline-none w-full text-sm text-coffee dark:text-warm-text cursor-pointer [&>option]:text-black [&>option]:bg-white"
+                     >
+                        <option value="gemini-2.5-flash-image">Flash 2.5 (快速/免費)</option>
+                        <option value="gemini-2.0-flash-exp">Flash 2.0 (實驗版)</option>
+                        <option value="gemini-3-pro-image-preview">Pro 3 (高畫質/付費)</option>
+                     </select>
+                  </div>
+                  <p className="text-[10px] text-coffee/50 dark:text-warm-text/50 px-1">
+                    * 推薦使用 Flash 2.5 以獲得最佳速度與免費額度。
+                  </p>
+               </div>
+            </div>
+          )}
+
+          {/* Custom Settings */}
+          {provider === 'custom' && (
+             <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
+                <div className="p-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-100 dark:border-blue-500/20">
+                   <p className="text-[10px] text-blue-800 dark:text-blue-200 leading-relaxed">
+                     適用於支援 <strong>OpenAI Chat API</strong> 格式的服務 (如 OpenRouter, DeepSeek, LocalAI)。模型必須具備 Vision 能力。
+                   </p>
+                </div>
+
+                <div className="space-y-2">
+                   <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider flex items-center gap-1">
+                      <Globe size={12} /> Base URL
+                   </label>
+                   <input 
+                      type="text"
+                      value={customConfig.baseUrl}
+                      onChange={(e) => setCustomConfig('baseUrl', e.target.value)}
+                      placeholder="https://openrouter.ai/api/v1"
+                      className="w-full bg-white dark:bg-obsidian border border-coffee/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs text-coffee dark:text-warm-text font-mono focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50"
+                   />
+                </div>
+
+                <div className="space-y-2">
+                   <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider flex items-center gap-1">
+                      <Key size={12} /> API Key
+                   </label>
+                   <div className="relative">
+                      <input 
+                         type={showApiKey ? "text" : "password"}
+                         value={customConfig.apiKey}
+                         onChange={(e) => setCustomConfig('apiKey', e.target.value)}
+                         placeholder="sk-..."
+                         className="w-full bg-white dark:bg-obsidian border border-coffee/10 dark:border-white/10 rounded-xl px-3 py-2.5 pr-10 text-xs text-coffee dark:text-warm-text font-mono focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50"
+                      />
+                      <button 
+                         onClick={() => setShowApiKey(!showApiKey)}
+                         className="absolute right-3 top-1/2 -translate-y-1/2 text-coffee/40 dark:text-warm-text/40 hover:text-coffee dark:hover:text-warm-text"
+                      >
+                         {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                   </div>
+                </div>
+
+                <div className="space-y-2">
+                   <label className="text-xs font-bold text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider flex items-center gap-1">
+                      <Server size={12} /> Model ID
+                   </label>
+                   <input 
+                      type="text"
+                      value={customConfig.modelName}
+                      onChange={(e) => setCustomConfig('modelName', e.target.value)}
+                      placeholder="e.g. gpt-4o, claude-3-5-sonnet"
+                      className="w-full bg-white dark:bg-obsidian border border-coffee/10 dark:border-white/10 rounded-xl px-3 py-2.5 text-xs text-coffee dark:text-warm-text font-mono focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50"
+                   />
+                </div>
+             </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-sand/30 dark:bg-black/20 border-t border-coffee/5 dark:border-white/5">
+           <button 
+             onClick={onClose}
+             className="w-full py-3 bg-gradient-to-r from-accent to-purple-600 hover:from-accent-glow hover:to-purple-500 text-white rounded-xl font-bold shadow-lg shadow-accent/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+           >
+             <Check size={18} />
+             <span>完成設定</span>
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const App: React.FC = () => {
-  // Theme State - Default to Dark Mode
+  // Theme State
   const [darkMode, setDarkMode] = useState<boolean>(true);
 
-  // Default to Flash Image as it is more likely to be available than Pro Preview
-  const [modelName, setModelName] = useState<string>('gemini-2.5-flash-image');
+  // --- Provider Settings State ---
+  const [provider, setProvider] = useState<ProviderType>('google');
   
-  const [apiKey, setApiKey] = useState<string>('');
-  const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  // Google State
+  const [googleModelName, setGoogleModelName] = useState<string>('gemini-2.5-flash-image');
+  const [googleApiKey, setGoogleApiKey] = useState<string>('');
+  
+  // Custom State
+  const [customConfig, setCustomConfig] = useState<CustomConfig>({
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiKey: '',
+    modelName: 'anthropic/claude-3.5-sonnet'
+  });
 
+  // Modal State
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  
+  // App Logic State
   const [userImage, setUserImage] = useState<ImageFile | null>(null);
   const [garmentImage, setGarmentImage] = useState<ImageFile | null>(null);
   const [promptText, setPromptText] = useState<string>('');
-  
   const [resultData, setResultData] = useState<VTONResult | null>(null);
   const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -27,17 +232,48 @@ const App: React.FC = () => {
   const resultSectionRef = useRef<HTMLDivElement>(null);
   const isGeneratingRef = useRef<boolean>(false);
 
-  // Load API key from local storage
+  // Initialization
   useEffect(() => {
     const savedKey = localStorage.getItem('gemini_api_key');
-    if (savedKey) setApiKey(savedKey);
+    if (savedKey) setGoogleApiKey(savedKey);
+
+    const savedProvider = localStorage.getItem('doppl_provider');
+    if (savedProvider === 'custom' || savedProvider === 'google') {
+      setProvider(savedProvider as ProviderType);
+    }
+
+    const savedCustom = localStorage.getItem('doppl_custom_config');
+    if (savedCustom) {
+      try {
+        setCustomConfig(JSON.parse(savedCustom));
+      } catch (e) {
+        console.error("Failed to parse saved custom config");
+      }
+    }
+    
+    // Auto-open settings if no key found on first load
+    if (!savedKey && !localStorage.getItem('gemini_api_key')) {
+       // Small delay for UX
+       setTimeout(() => setIsSettingsOpen(true), 800);
+    }
   }, []);
 
-  // Save API key when changed
-  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newKey = e.target.value.trim(); // Auto trim
-    setApiKey(newKey);
+  // Handlers
+  const handleGoogleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newKey = e.target.value.trim();
+    setGoogleApiKey(newKey);
     localStorage.setItem('gemini_api_key', newKey);
+  };
+
+  const handleProviderChange = (newProvider: ProviderType) => {
+    setProvider(newProvider);
+    localStorage.setItem('doppl_provider', newProvider);
+  };
+
+  const handleCustomConfigChange = (key: keyof CustomConfig, value: string) => {
+    const newConfig = { ...customConfig, [key]: value };
+    setCustomConfig(newConfig);
+    localStorage.setItem('doppl_custom_config', JSON.stringify(newConfig));
   };
 
   const handleImageUpload = async (file: File, type: 'user' | 'garment') => {
@@ -50,10 +286,8 @@ const App: React.FC = () => {
         base64,
         mimeType: file.type
       };
-
       if (type === 'user') setUserImage(imageFile);
       else setGarmentImage(imageFile);
-      
       setErrorMsg(null);
     } catch (err) {
       console.error("File processing error", err);
@@ -79,23 +313,32 @@ const App: React.FC = () => {
   };
 
   const handleGenerate = async () => {
-    const cleanKey = apiKey.trim();
-    if (!cleanKey) {
-      setErrorMsg("請輸入您的 Gemini API Key 才能開始生成。");
+    // Validation
+    if (provider === 'google' && !googleApiKey) {
+      setIsSettingsOpen(true);
+      setErrorMsg("請先設定 Google API Key。");
       return;
     }
+    if (provider === 'custom') {
+      if (!customConfig.baseUrl || !customConfig.apiKey || !customConfig.modelName) {
+        setIsSettingsOpen(true);
+        setErrorMsg("請完整填寫自定義 API 設定。");
+        return;
+      }
+    }
+    
     if (!userImage || !garmentImage) return;
     
     setErrorMsg(null);
     isGeneratingRef.current = true;
 
-    // Start phases visual
     const phasesPromise = simulatePhases();
     
-    // Start generation
     const generationPromise = generateVTON(
-      cleanKey,
-      modelName,
+      provider,
+      googleApiKey,
+      googleModelName,
+      customConfig,
       promptText,
       userImage.base64,
       userImage.mimeType,
@@ -104,28 +347,23 @@ const App: React.FC = () => {
     );
 
     try {
-      // Wait for both animation and generation
       const [_, result] = await Promise.all([phasesPromise, generationPromise]);
       
       if (isGeneratingRef.current) {
         setResultData(result);
         setStatus(AppStatus.COMPLETE);
-        
-        // Auto scroll to result after short delay
         setTimeout(() => {
           resultSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 100);
       }
-
     } catch (error: any) {
       console.error("Generation failed", error);
       isGeneratingRef.current = false;
       setStatus(AppStatus.ERROR);
-      
       if (error.message) {
          setErrorMsg(error.message);
       } else {
-         setErrorMsg("生成失敗。請檢查網路連線或稍後再試。");
+         setErrorMsg("生成失敗。請檢查設定或網路連線。");
       }
     } finally {
       isGeneratingRef.current = false;
@@ -147,68 +385,71 @@ const App: React.FC = () => {
     isGeneratingRef.current = false;
   };
 
-  const isProcessing = status === AppStatus.UPLOADING || 
-                       status === AppStatus.ANALYZING || 
-                       status === AppStatus.WARPING || 
-                       status === AppStatus.COMPOSITING || 
-                       status === AppStatus.RENDERING;
+  const isProcessing = status !== AppStatus.IDLE && status !== AppStatus.COMPLETE && status !== AppStatus.ERROR;
 
   return (
     <div className={darkMode ? 'dark' : ''}>
+      <SettingsModal 
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        provider={provider}
+        setProvider={handleProviderChange}
+        googleApiKey={googleApiKey}
+        setGoogleApiKey={handleGoogleKeyChange}
+        googleModelName={googleModelName}
+        setGoogleModelName={setGoogleModelName}
+        customConfig={customConfig}
+        setCustomConfig={handleCustomConfigChange}
+      />
+
       <div className="min-h-screen transition-colors duration-500 bg-paper text-coffee dark:bg-obsidian dark:text-warm-text font-sans selection:bg-accent/30 selection:text-coffee dark:selection:text-warm-text pb-20">
         <ProcessingOverlay status={status} />
 
         {/* Header */}
         <header className="fixed top-0 left-0 right-0 z-40 bg-paper/80 dark:bg-obsidian/80 backdrop-blur-md border-b border-coffee/5 dark:border-white/5 transition-colors duration-500">
-          <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-accent to-purple-500 rounded-lg flex items-center justify-center shadow-lg">
+              <div className="w-8 h-8 bg-gradient-to-br from-accent to-purple-500 rounded-lg flex items-center justify-center shadow-lg shadow-accent/20">
                 <Sparkles size={18} className="text-white" />
               </div>
               <span className="font-display font-bold text-lg tracking-tight text-coffee dark:text-white">Doppl-Next</span>
             </div>
-            <div className="flex items-center gap-4">
-              
-               {/* Model Selector */}
-               <div className="flex items-center gap-3 text-xs font-mono text-coffee/70 dark:text-warm-text/70 bg-sand dark:bg-white/5 px-3 py-1.5 rounded-full border border-coffee/10 dark:border-white/5 transition-colors">
-                  <Settings2 size={12} />
-                  <select 
-                    value={modelName}
-                    onChange={(e) => setModelName(e.target.value)}
-                    className="bg-transparent border-none outline-none text-coffee dark:text-warm-text cursor-pointer max-w-[150px] md:max-w-none truncate [&>option]:text-black [&>option]:bg-white"
-                    disabled={isProcessing}
-                  >
-                    <option value="gemini-2.5-flash-image">Flash 2.5 (Standard)</option>
-                    <option value="gemini-2.0-flash-exp">Flash 2.0 (Experimental)</option>
-                    <option value="gemini-3-pro-image-preview">Pro 3 (High Res)</option>
-                  </select>
+            
+            <div className="flex items-center gap-3">
+               {/* Current Model Label (Optional, showing active config) */}
+               <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono text-coffee/40 dark:text-warm-text/40 bg-coffee/5 dark:bg-white/5 px-2 py-1 rounded-md">
+                  <div className={`w-1.5 h-1.5 rounded-full ${provider === 'google' && googleApiKey ? 'bg-green-500' : provider === 'custom' && customConfig.apiKey ? 'bg-blue-500' : 'bg-red-500'}`}></div>
+                  {provider === 'google' ? 'Gemini' : 'Custom'}
                </div>
 
-               {/* Theme Toggle */}
+               <button 
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-coffee/5 dark:bg-white/5 hover:bg-coffee/10 dark:hover:bg-white/10 text-coffee dark:text-warm-text/80 transition-colors border border-transparent hover:border-coffee/10 dark:hover:border-white/10"
+                  title="設定"
+               >
+                  <Settings size={16} />
+                  <span className="text-xs font-medium hidden sm:inline">Settings</span>
+               </button>
+
                <button 
                   onClick={() => setDarkMode(!darkMode)}
-                  className="p-2 rounded-full hover:bg-coffee/5 dark:hover:bg-white/10 transition-colors text-coffee dark:text-warm-text/80"
+                  className="p-2 rounded-full hover:bg-coffee/5 dark:hover:bg-white/10 transition-colors text-coffee dark:text-warm-text/80 active:scale-90"
                   title={darkMode ? "切換亮色模式" : "切換暗色模式"}
                >
                   {darkMode ? <Sun size={18} /> : <Moon size={18} />}
                </button>
-
-               <div className="hidden md:flex items-center gap-1.5 text-xs font-mono text-coffee/60 dark:text-warm-text/60">
-                  <span className={`w-2 h-2 rounded-full ${isProcessing ? 'bg-yellow-500' : 'bg-green-500 animate-pulse'} shadow-[0_0_8px_rgba(34,197,94,0.4)]`}></span>
-                  ONLINE
-               </div>
             </div>
           </div>
         </header>
 
-        <main className="pt-24 px-6 max-w-7xl mx-auto flex flex-col items-center">
+        <main className="pt-24 px-4 md:px-6 max-w-7xl mx-auto flex flex-col items-center">
           
           {!resultData && (
             <div className="text-center space-y-4 max-w-2xl mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <h1 className="text-3xl md:text-5xl font-display font-bold text-coffee dark:text-white tracking-tight leading-tight">
                 Gemini 3 Pro <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-purple-400">真實物理 VTON 引擎</span>
               </h1>
-              <p className="text-coffee/70 dark:text-warm-text/70 text-lg leading-relaxed">
+              <p className="text-coffee/70 dark:text-warm-text/70 text-base md:text-lg leading-relaxed px-4">
                 上傳照片與服裝。利用高階物理模擬與 <span className="text-coffee dark:text-white font-medium">Phantom Haptics</span> 觸感分析技術，合成 8K 級的攝影擬真試穿效果。
               </p>
             </div>
@@ -222,70 +463,10 @@ const App: React.FC = () => {
 
           <div className="w-full max-w-4xl space-y-8">
             
-            <div className="bg-sand/60 dark:bg-charcoal/30 border border-coffee/5 dark:border-white/5 rounded-3xl p-6 md:p-8 backdrop-blur-sm shadow-xl dark:shadow-none transition-colors duration-500">
+            {/* Workspace Card */}
+            <div className="bg-sand/60 dark:bg-charcoal/30 border border-coffee/5 dark:border-white/5 rounded-3xl p-5 md:p-8 backdrop-blur-sm shadow-xl dark:shadow-none transition-colors duration-500">
               
-              <div className="w-full mb-8">
-                <div className="flex justify-between items-center px-1 mb-2">
-                  <label className="text-xs font-medium text-coffee/60 dark:text-warm-text/60 uppercase tracking-wider">
-                    Gemini API 設定
-                  </label>
-                  <a 
-                    href="https://aistudio.google.com/app/apikey" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-accent hover:text-accent-glow transition-colors"
-                  >
-                    <span>取得 API Key</span>
-                    <ExternalLink size={12} />
-                  </a>
-                </div>
-                
-                <div className="w-full bg-white dark:bg-charcoal border border-coffee/10 dark:border-white/10 rounded-xl p-3 flex items-center gap-3 transition-colors hover:border-accent/30 focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/50 shadow-sm dark:shadow-none">
-                  <Key size={18} className="text-coffee/40 dark:text-warm-text/40 shrink-0" />
-                  <input 
-                    type={showApiKey ? "text" : "password"}
-                    value={apiKey}
-                    onChange={handleApiKeyChange}
-                    placeholder="在此輸入您的 Gemini API Key (AIza開頭)"
-                    className="bg-transparent border-none outline-none flex-1 text-sm text-coffee dark:text-warm-text placeholder-coffee/30 dark:placeholder-warm-text/30 font-mono"
-                  />
-                  <button 
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="text-coffee/40 dark:text-warm-text/50 hover:text-coffee dark:hover:text-warm-text transition-colors"
-                  >
-                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                
-                {/* Critical Billing Warning */}
-                <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-500/30 rounded-xl">
-                  <div className="flex items-start gap-3">
-                    <ShieldAlert size={20} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                    <div className="space-y-2">
-                      <p className="text-sm font-bold text-red-700 dark:text-red-300">
-                        ⚠️ 關於費用與免費層級 (Billing Alert)
-                      </p>
-                      <p className="text-xs text-red-700/80 dark:text-red-300/80 leading-relaxed">
-                        請務必確認您的 Google AI Studio 專案處於 <strong>「Free of Charge (免費)」</strong> 狀態。
-                        <br/><br/>
-                        若您在綁定卡片後啟用了 <strong>「Pay-as-you-go (即用即付)」</strong>，Google 將會對生成的圖片進行收費。如果您看到 Google Cloud 有費用產生，請立即：
-                        <ol className="list-decimal pl-4 mt-1 space-y-1">
-                          <li>前往 Google Cloud Console <strong>停用計費 (Disable Billing)</strong> 以停止扣款。</li>
-                          <li>聯絡 Google Billing Support 說明是誤操作，通常可申請退款 (Refund)。</li>
-                        </ol>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2 mt-3 px-3 py-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-500/20">
-                  <Info size={16} className="text-blue-500 mt-0.5 shrink-0" />
-                  <p className="text-[12px] text-coffee/70 dark:text-warm-text/70 leading-relaxed">
-                    <strong>正常使用：</strong> 在 AI Studio 預設的 "Free Tier" 下，若達到上限會顯示 429 錯誤（停止服務），<strong>不會扣款</strong>。只有當您手動升級計畫後，才會產生費用。
-                  </p>
-                </div>
-              </div>
-
+              {/* Error Message Display */}
               {errorMsg && (
                 <div className="w-full bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-200 p-4 rounded-xl flex items-start gap-3 mb-8 animate-in fade-in slide-in-from-top-2 shadow-sm">
                   <AlertTriangle className="shrink-0 mt-0.5" size={18} />
@@ -293,7 +474,7 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex flex-col md:flex-row gap-6 mb-8">
+              <div className="flex flex-col md:flex-row gap-4 md:gap-8 mb-8 relative">
                 <ImageUploadCard
                   id="user-upload"
                   label="目標使用者"
@@ -302,9 +483,18 @@ const App: React.FC = () => {
                   onUpload={(f) => handleImageUpload(f, 'user')}
                   onRemove={() => setUserImage(null)}
                   disabled={isProcessing}
+                  className="w-full md:flex-1 min-w-0"
                 />
 
-                <div className="hidden md:flex flex-col justify-center items-center text-coffee/30 dark:text-warm-text/30 px-2">
+                {/* Mobile Connector */}
+                <div className="md:hidden flex justify-center -my-4 z-10 pointer-events-none">
+                   <div className="p-2 rounded-full bg-paper dark:bg-obsidian border border-coffee/10 dark:border-white/10 shadow-lg text-coffee/30 dark:text-warm-text/30">
+                     <Settings size={16} className="rotate-90 opacity-0" /> {/* Spacer */}
+                   </div>
+                </div>
+
+                {/* Desktop Connector */}
+                <div className="hidden md:flex flex-col justify-center items-center text-coffee/30 dark:text-warm-text/30 px-2 shrink-0">
                   <div className="h-full w-px bg-gradient-to-b from-transparent via-coffee/10 dark:via-white/10 to-transparent absolute"></div>
                   <div className="p-3 border border-coffee/10 dark:border-white/10 rounded-full bg-paper dark:bg-obsidian z-10 shadow-xl transition-colors duration-500">
                     {isProcessing ? (
@@ -326,13 +516,14 @@ const App: React.FC = () => {
                   onUpload={(f) => handleImageUpload(f, 'garment')}
                   onRemove={() => setGarmentImage(null)}
                   disabled={isProcessing}
+                  className="w-full md:flex-1 min-w-0"
                 />
               </div>
 
               <div className="space-y-3">
                 <label htmlFor="prompt-input" className="flex items-center gap-2 text-sm font-medium text-coffee/80 dark:text-warm-text/80 ml-1">
                   <MessageSquare size={16} className="text-accent" />
-                  {resultData ? '微調需求 / 追加指令 (Refinement)' : '詳細微調需求 (選填)'}
+                  {resultData ? '微調需求 / 追加指令' : '詳細微調需求 (選填)'}
                 </label>
                 <textarea
                   id="prompt-input"
@@ -346,25 +537,25 @@ const App: React.FC = () => {
                 />
               </div>
 
-              <div className="mt-8 flex gap-4">
+              <div className="mt-8 flex flex-col sm:flex-row gap-4">
                 {resultData && (
                   <button
                     onClick={fullReset}
-                    className="px-6 py-4 rounded-xl border border-coffee/10 dark:border-white/10 bg-white dark:bg-white/5 text-coffee/70 dark:text-warm-text/70 font-bold hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                    className="px-6 py-4 rounded-xl border border-coffee/10 dark:border-white/10 bg-white dark:bg-white/5 text-coffee/70 dark:text-warm-text/70 font-bold hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2 active:scale-95"
                     disabled={isProcessing}
                   >
                     <Trash2 size={18} />
-                    清除重來
+                    <span className="sm:hidden md:inline">重來</span>
                   </button>
                 )}
                 
                 <button
                   onClick={handleGenerate}
-                  disabled={isProcessing || !apiKey || !userImage || !garmentImage}
+                  disabled={isProcessing || !userImage || !garmentImage}
                   className={`
                     flex-1 py-4 rounded-xl font-bold text-base tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-accent/20
-                    transition-all duration-300
-                    ${(isProcessing || !apiKey || !userImage || !garmentImage)
+                    transition-all duration-300 active:scale-95
+                    ${(isProcessing || !userImage || !garmentImage)
                       ? 'bg-gray-200 dark:bg-charcoal/50 text-gray-400 dark:text-white/30 cursor-not-allowed border border-transparent dark:border-white/5' 
                       : 'bg-gradient-to-r from-accent to-purple-600 hover:from-accent-glow hover:to-purple-500 text-white border border-transparent dark:border-white/10 hover:shadow-accent/40'}
                   `}
@@ -372,17 +563,19 @@ const App: React.FC = () => {
                   {isProcessing ? (
                     <>
                       <RefreshCw className="animate-spin" size={20} />
-                      <span>ENGINE PROCESSING...</span>
+                      <span>PROCESSING...</span>
                     </>
                   ) : resultData ? (
                     <>
                       <Sparkles size={20} />
-                      <span>依據新設定重新生成 (Re-Generate)</span>
+                      <span>依據新設定重新生成</span>
                     </>
                   ) : (
                     <>
                       <Sparkles size={20} />
-                      <span>啟動 VTON 引擎 (Generate)</span>
+                      <span>
+                         {provider === 'google' && !googleApiKey ? '設定 Key 並啟動' : '啟動 VTON 引擎'}
+                      </span>
                     </>
                   )}
                 </button>

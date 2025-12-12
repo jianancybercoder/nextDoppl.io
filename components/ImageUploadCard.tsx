@@ -10,6 +10,7 @@ interface ImageUploadCardProps {
   onUpload: (file: File) => void;
   onRemove: () => void;
   disabled?: boolean;
+  className?: string;
 }
 
 const ImageUploadCard: React.FC<ImageUploadCardProps> = ({
@@ -20,6 +21,7 @@ const ImageUploadCard: React.FC<ImageUploadCardProps> = ({
   onUpload,
   onRemove,
   disabled = false,
+  className = ""
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,22 +45,22 @@ const ImageUploadCard: React.FC<ImageUploadCardProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-3 flex-1 min-w-[300px]">
-      <div className="flex justify-between items-baseline">
+    <div className={`flex flex-col gap-3 ${className}`}>
+      <div className="flex justify-between items-baseline px-1">
         <label htmlFor={id} className="text-sm font-semibold text-coffee/80 dark:text-warm-text/80 uppercase tracking-wider font-display">
           {label}
         </label>
-        <span className="text-xs text-coffee/50 dark:text-warm-text/50">{subLabel}</span>
+        <span className="text-[10px] sm:text-xs text-coffee/50 dark:text-warm-text/50">{subLabel}</span>
       </div>
 
       <div
         className={`
           relative group flex flex-col items-center justify-center w-full aspect-[3/4] 
-          rounded-xl border-2 border-dashed transition-all duration-300 overflow-hidden
+          rounded-2xl border-2 border-dashed transition-all duration-300 overflow-hidden shadow-sm
           ${image 
             ? 'border-accent/50 bg-white dark:bg-charcoal' 
             : 'border-coffee/10 dark:border-white/10 bg-white/50 dark:bg-charcoal/50 hover:border-accent/30 dark:hover:border-white/20 hover:bg-white dark:hover:bg-charcoal/80'}
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'}
         `}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -87,7 +89,7 @@ const ImageUploadCard: React.FC<ImageUploadCardProps> = ({
                   e.stopPropagation();
                   onRemove();
                 }}
-                className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-red-500/80 backdrop-blur-md rounded-full text-white transition-all"
+                className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-red-500/80 backdrop-blur-md rounded-full text-white transition-all shadow-lg active:scale-95"
               >
                 <X size={16} />
               </button>
@@ -96,14 +98,14 @@ const ImageUploadCard: React.FC<ImageUploadCardProps> = ({
           </>
         ) : (
           <div className="flex flex-col items-center text-center p-6 space-y-4">
-            <div className="p-4 rounded-full bg-coffee/5 dark:bg-white/5 group-hover:bg-accent/10 transition-colors">
+            <div className="p-4 rounded-full bg-coffee/5 dark:bg-white/5 group-hover:bg-accent/10 transition-colors duration-300">
               <Upload size={24} className="text-coffee/40 dark:text-warm-text/40 group-hover:text-accent transition-colors" />
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-coffee dark:text-warm-text">
-                <span className="text-accent">點擊上傳</span> 或拖放檔案
+                <span className="text-accent">點擊上傳</span> 或拖放
               </p>
-              <p className="text-xs text-coffee/50 dark:text-warm-text/50">JPG, PNG (最大 10MB)</p>
+              <p className="text-[10px] text-coffee/50 dark:text-warm-text/50">JPG, PNG (Max 10MB)</p>
             </div>
           </div>
         )}

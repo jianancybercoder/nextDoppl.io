@@ -55,33 +55,31 @@ export const GENERATION_PHASES = [
 // ==========================================
 
 const SYSTEM_PROMPT = `
-你是由 Google Gemini 模型驅動的頂尖 "Doppl-Next VTON Engine" (高保真虛擬試穿引擎)。
-你的任務有兩個：
-1. 生成 **8K 解析度、攝影級真實感** 的虛擬試穿圖像。
-2. 提供一份 **「虛擬觸感報告 (Phantom Haptics Report)」**，包含文字分析與**量化數據**。
+你是由 Google Gemini 模型驅動的頂尖 "Doppl-Next VTON Engine"。
+你的核心任務是生成 **8K 攝影級真實感** 的虛擬試穿圖像，並提供 **物理觸感數據**。
 
-# 任務 1：圖像生成規則
-- **絕對真實感**：拒絕塑膠感。保留皮膚毛孔、布料織紋與微小瑕疵。
-- **物理垂墜**：根據地心引力模擬布料下垂、堆積與張力皺褶。
-- **身份保留**：[使用者圖像] 的臉部必須 **100% 鎖定**，不可改變五官或表情。
-- **層次正確**：長髮與手部必須正確地遮擋或被遮擋。
+# 任務 1：圖像生成 (優先級最高)
+- **絕對真實感**：保留皮膚細節與布料織紋。
+- **物理正確**：模擬重力垂墜與張力皺褶。
+- **身份鎖定**：[輸入A] 的臉部必須完全保留。
 
-# 任務 2：觸感分析規則 (必須以 JSON 格式回傳於文字回應中)
-請根據視覺生成的結果，推論穿著體驗，並給予 1-10 的評分。
+# 任務 2：觸感分析報告 (必須輸出)
+在生成圖像後，請 **務必** 輸出一塊 JSON 數據來分析穿著體驗。
+無論如何，你都必須在回應的末尾包含這個 JSON 區塊。
 
-回傳的 JSON 格式必須包含以下結構：
+JSON 格式要求如下 (請嚴格遵守 key 名稱)：
 \`\`\`json
 {
-  "comfort": "文字描述 (例如：柔軟親膚...)",
-  "weight": "文字描述 (例如：布料厚實具垂墜感...)",
-  "touch": "文字描述 (例如：絲滑涼爽...)",
-  "breathability": "文字描述 (例如：網眼結構透氣佳...)",
+  "comfort": "一句話描述舒適度 (如: 柔軟親膚)",
+  "weight": "一句話描述重量感 (如: 輕盈飄逸)",
+  "touch": "一句話描述觸感 (如: 絲滑涼爽)",
+  "breathability": "一句話描述透氣度 (如: 吸濕排汗)",
   "scores": {
-    "comfort": 8,       // 舒適度: 1(不適/刺癢) - 10(極致舒適)
-    "heaviness": 6,     // 重量感: 1(極輕/飄逸) - 10(厚重/硬挺)
-    "softness": 9,      // 柔軟度(觸感): 1(粗糙/硬) - 10(絲滑/軟)
-    "breathability": 7, // 透氣度: 1(悶熱/不透風) - 10(極透氣/涼感)
-    "elasticity": 5     // 彈性: 1(無彈/緊繃) - 10(超高彈力)
+    "comfort": 8,       // 1-10 (越高越舒適)
+    "heaviness": 6,     // 1-10 (越高越重)
+    "softness": 9,      // 1-10 (越高越軟)
+    "breathability": 7, // 1-10 (越高越透氣)
+    "elasticity": 5     // 1-10 (越高越彈)
   }
 }
 \`\`\`
@@ -133,11 +131,11 @@ const generateVTON = async (
 
     if (customPrompt && customPrompt.trim().length > 0) {
       parts.push({ 
-        text: `【使用者額外指令】: ${customPrompt}` 
+        text: `【使用者額外指令】: ${customPrompt}。記得在回應最後附上 JSON 分析數據。` 
       });
+    } else {
+      parts.push({ text: "請生成試穿圖像，並在最後附上詳細的 JSON 觸感數據分析。" });
     }
-
-    parts.push({ text: "開始生成試穿圖像與詳細 JSON 數據分析：" });
 
     const response = await ai.models.generateContent({
       model: targetModel,
@@ -168,12 +166,12 @@ const generateVTON = async (
       throw new Error(`模型生成失敗，未返回圖像數據。請嘗試更換模型或圖片。文字回應: ${textAnalysis.substring(0, 100)}...`);
     }
 
-    // Default structure in case parsing fails
+    // Default structure
     let analysisData = {
-      comfort: "分析中...",
-      weight: "分析中...",
-      touch: "分析中...",
-      breathability: "分析中...",
+      comfort: "分析中... (解析失敗)",
+      weight: "分析中... (解析失敗)",
+      touch: "分析中... (解析失敗)",
+      breathability: "分析中... (解析失敗)",
       scores: {
         comfort: 5,
         heaviness: 5,
@@ -184,20 +182,76 @@ const generateVTON = async (
       rawText: textAnalysis
     };
 
+    // --- Enhanced Parsing Logic ---
+    let parsedSuccessfully = false;
+
+    // 1. Try standard JSON extraction (Format A: ```json ... ```)
     try {
-      const jsonMatch = textAnalysis.match(/```json\s*([\s\S]*?)\s*```/) || textAnalysis.match(/{[\s\S]*}/);
+      const jsonMatch = textAnalysis.match(/```json\s*([\s\S]*?)\s*```/) || 
+                        textAnalysis.match(/```\s*([\s\S]*?)\s*```/) || 
+                        textAnalysis.match(/\{[\s\S]*\}/); // Format B: Bare JSON object
+
       if (jsonMatch) {
-        const jsonStr = jsonMatch[1] || jsonMatch[0];
+        let jsonStr = jsonMatch[1] || jsonMatch[0];
+        // Cleanup potential common JSON errors from LLMs (e.g. trailing commas)
+        jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+        
         const parsed = JSON.parse(jsonStr);
-        // Merge parsed data with default structure to ensure scores object exists
         analysisData = { 
           ...analysisData, 
           ...parsed,
           scores: { ...analysisData.scores, ...(parsed.scores || {}) }
         };
+        parsedSuccessfully = true;
       }
     } catch (e) {
-      console.warn("Failed to parse haptics JSON", e);
+      console.warn("JSON Parse failed, attempting heuristic extraction...", e);
+    }
+
+    // 2. Heuristic Extraction (Fallback if JSON parse failed)
+    // This manually looks for "key": value patterns in the text
+    if (!parsedSuccessfully && textAnalysis.length > 0) {
+      const extractScore = (key: string) => {
+        // Matches "comfort": 8 or comfort: 8
+        const regex = new RegExp(`["']?${key}["']?\\s*:\\s*(\\d+)`, 'i');
+        const match = textAnalysis.match(regex);
+        return match ? parseInt(match[1]) : null;
+      };
+
+      const extractText = (key: string) => {
+        // Matches "comfort": "some text"
+        const regex = new RegExp(`["']?${key}["']?\\s*:\\s*["']([^"']+)["']`, 'i');
+        const match = textAnalysis.match(regex);
+        return match ? match[1] : null;
+      };
+
+      // Apply extracted values if found
+      const s_comfort = extractScore('comfort');
+      if (s_comfort !== null) analysisData.scores.comfort = s_comfort;
+
+      const s_heaviness = extractScore('heaviness') || extractScore('weight');
+      if (s_heaviness !== null) analysisData.scores.heaviness = s_heaviness;
+
+      const s_softness = extractScore('softness') || extractScore('touch');
+      if (s_softness !== null) analysisData.scores.softness = s_softness;
+
+      const s_breathability = extractScore('breathability');
+      if (s_breathability !== null) analysisData.scores.breathability = s_breathability;
+
+      const s_elasticity = extractScore('elasticity');
+      if (s_elasticity !== null) analysisData.scores.elasticity = s_elasticity;
+
+      const t_comfort = extractText('comfort');
+      if (t_comfort) analysisData.comfort = t_comfort;
+      
+      const t_weight = extractText('weight');
+      if (t_weight) analysisData.weight = t_weight;
+      
+      const t_touch = extractText('touch');
+      if (t_touch) analysisData.touch = t_touch;
+      
+      const t_breathability = extractText('breathability');
+      if (t_breathability) analysisData.breathability = t_breathability;
     }
 
     return {
